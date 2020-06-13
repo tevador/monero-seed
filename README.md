@@ -2,6 +2,7 @@
 ```
 git clone https://github.com/tevador/monero-seed.git
 cd monero-seed
+mkdir build && cd build
 cmake ..
 make
 ```
