@@ -10,6 +10,7 @@
 #include "reed_solomon_code.hpp"
 #include "argon2/argon2.h"
 #include "argon2/blake2/blake2-impl.h"
+#include "pbkdf2.h"
 #include <chrono>
 #include <cassert>
 #include <stdexcept>
@@ -56,6 +57,7 @@ constexpr unsigned phrase_words = gf_poly::max_degree + 1;
 constexpr unsigned total_bits = gf_elem::size() * phrase_words;
 constexpr uint32_t argon_tcost = 3;
 constexpr uint32_t argon_mcost = 256 * 1024;
+constexpr int pbkdf2_iterations = 4096;
 
 static_assert(total_bits
 	== version_bits + date_bits + reserved_bits + checksum_size +
@@ -102,11 +104,11 @@ monero_seed::monero_seed(std::time_t date_created) {
 	reserved_ = 0;
 	secure_random::gen_bytes(seed_.data(), seed_.size());
 	
-	char salt[25] = "Monero 14-word seed";
+	uint8_t salt[25] = "Monero 14-word seed";
 	salt[20] = version_;
 	store32(salt + 21, quantized_date);
-	argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
-
+	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
+	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
 	unsigned rem_bits = gf_elem::size();
 	write_data(message_, rem_bits, version_, version_bits);
 	write_data(message_, rem_bits, reserved_, reserved_bits);
@@ -186,10 +188,11 @@ monero_seed::monero_seed(const std::string& phrase) {
 
 	date_ = epoch + quantized_date * time_step;
 
-	char salt[25] = "Monero 14-word seed";
+	uint8_t salt[25] = "Monero 14-word seed";
 	salt[20] = version_;
 	store32(salt + 21, quantized_date);
-	argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
+	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
+	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
 }
 
 std::ostream& operator<<(std::ostream& os, const monero_seed& seed) {

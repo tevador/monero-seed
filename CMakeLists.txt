@@ -19,6 +19,7 @@ src/gf_elem.cpp
 src/gf_poly.cpp
 src/main.cpp
 src/monero_seed.cpp
+src/pbkdf2.c
 src/reed_solomon_code.cpp
 src/secure_random.cpp
 src/wordlist.cpp)
