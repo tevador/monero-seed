@@ -18,16 +18,16 @@ public:
 	static constexpr size_t key_size = 32;
 	using secret_key = std::array<uint8_t, key_size>;
 	using secret_seed = std::array<uint8_t, size>;
-	monero_seed(const std::string& phrase);
-	monero_seed(std::time_t date_created);
+	monero_seed(const std::string& phrase, const std::string& coin);
+	monero_seed(std::time_t date_created, const std::string& coin, const std::string& net);
 	std::time_t date() const {
 		return date_;
 	}
-	unsigned version() const {
-		return version_ + 1;
-	}
 	const std::string& correction() const {
 		return correction_;
+	}
+	const char* net_name() const {
+		return net_name_;
 	}
 	const secret_key& key() const {
 		return key_;
@@ -37,10 +37,11 @@ private:
 	secret_seed seed_;
 	secret_key key_;
 	std::time_t date_;
-	unsigned version_;
+	unsigned net_type_;
 	unsigned reserved_;
 	std::string correction_;
 	gf_poly message_;
+	const char* net_name_;
 };
 
 std::ostream& operator<<(std::ostream& os, const monero_seed::secret_key& key);

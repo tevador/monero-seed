@@ -11,10 +11,10 @@ public:
     static constexpr gf_item size() {
         return gf_2048::size();
     }
-    gf_elem() : value_(0)
+    constexpr gf_elem() : value_(0)
     {
     }
-    gf_elem(gf_item value) : value_(value)
+    constexpr gf_elem(gf_item value) : value_(value)
     {
     }
     gf_elem& operator+=(gf_elem x) {

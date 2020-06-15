@@ -10,14 +10,26 @@
 #include <stdexcept>
 #include <cstring>
 
-static inline void read_string_option(const char* option, int argc, char** argv, char** out) {
+static inline void read_string_option(const char* option, int argc,
+	const char** argv, const char** out, const char* def_val = nullptr) {
 	for (int i = 0; i < argc - 1; ++i) {
 		if (strcmp(argv[i], option) == 0) {
 			*out = argv[i + 1];
 			return;
 		}
 	}
-	*out = NULL;
+	*out = def_val;
+}
+
+static inline void read_option(const char* option, int argc, const char** argv,
+	bool& out) {
+	for (int i = 0; i < argc; ++i) {
+		if (strcmp(argv[i], option) == 0) {
+			out = true;
+			return;
+		}
+	}
+	out = false;
 }
 
 static time_t parse_date(const char* s) {
@@ -39,40 +51,54 @@ static time_t parse_date(const char* s) {
 	throw std::runtime_error("invalid date");
 }
 
-void print_seed(const monero_seed& seed, bool phrase) {
+void print_seed(const monero_seed& seed, const char* coin, bool phrase) {
 	if (!seed.correction().empty()) {
 		std::cout << "Warning: corrected erasure: " << monero_seed::erasure << " -> " << seed.correction() << std::endl;
 	}
 	if (phrase) {
 		std::cout << "Mnemonic phrase: " << seed << std::endl;
 	}
-	std::cout << "- version: " << seed.version() << std::endl;
+	std::cout << "- coin: " << coin << std::endl;
+	std::cout << "- network: " << seed.net_name() << std::endl;
 	std::cout << "- private key: " << seed.key() << std::endl;
 	auto created_on = seed.date();
 	std::tm tm = *std::localtime(&created_on);
 	std::cout << "- created on or after: " << std::put_time(&tm, "%d/%b/%Y") << std::endl;
 }
 
-int main(int argc, char** argv) {
-	char* create;
-	char* restore;
-	read_string_option("--create", argc, argv, &create);
+int main(int argc, const char* argv[]) {
+	bool create;
+	const char* create_date;
+	const char* create_net;
+	const char* coin;
+	const char* restore;
+	read_option("--create", argc, argv, create);
+	read_string_option("--date", argc, argv, &create_date);
+	read_string_option("--net", argc, argv, &create_net, "MAIN");
+	read_string_option("--coin", argc, argv, &coin, "monero");
 	read_string_option("--restore", argc, argv, &restore);
 
 	try {
-		if (create != NULL) {
-			monero_seed seed(parse_date(create));
-			print_seed(seed, true);
+		if (create) {
+			time_t time;
+			if (create_date != nullptr) {
+				time = parse_date(create_date);
+			}
+			else {
+				time = std::time(nullptr);
+			}
+			monero_seed seed(time, coin, create_net);
+			print_seed(seed, coin, true);
 		}
-		else if (restore != NULL) {
-			monero_seed seed(restore);
-			print_seed(seed, false);
+		else if (restore != nullptr) {
+			monero_seed seed(restore, coin);
+			print_seed(seed, coin, false);
 		}
 		else {
 			std::cout << "Monero 14-word mnemonic seed proof of concept" << std::endl;
 			std::cout << "Usage: " << std::endl;
-			std::cout << argv[0] << " --create <yyyy-MM-dd>" << std::endl;
-			std::cout << argv[0] << " --restore <14-word seed>" << std::endl;
+			std::cout << argv[0] << " --create [--coin <monero|aeon>] [--net <MAIN|STAGE|TEST>] [--date <yyyy-MM-dd>]" << std::endl;
+			std::cout << argv[0] << " --restore \"<14-word seed>\" [--coin <monero|aeon>]" << std::endl;
 		}
 	}
 	catch (const std::exception & ex) {
