@@ -59,7 +59,6 @@ void print_seed(const monero_seed& seed, const char* coin, bool phrase) {
 		std::cout << "Mnemonic phrase: " << seed << std::endl;
 	}
 	std::cout << "- coin: " << coin << std::endl;
-	std::cout << "- network: " << seed.net_name() << std::endl;
 	std::cout << "- private key: " << seed.key() << std::endl;
 	auto created_on = seed.date();
 	std::tm tm = *std::localtime(&created_on);
@@ -69,12 +68,10 @@ void print_seed(const monero_seed& seed, const char* coin, bool phrase) {
 int main(int argc, const char* argv[]) {
 	bool create;
 	const char* create_date;
-	const char* create_net;
 	const char* coin;
 	const char* restore;
 	read_option("--create", argc, argv, create);
 	read_string_option("--date", argc, argv, &create_date);
-	read_string_option("--net", argc, argv, &create_net, "MAIN");
 	read_string_option("--coin", argc, argv, &coin, "monero");
 	read_string_option("--restore", argc, argv, &restore);
 
@@ -87,7 +84,7 @@ int main(int argc, const char* argv[]) {
 			else {
 				time = std::time(nullptr);
 			}
-			monero_seed seed(time, coin, create_net);
+			monero_seed seed(time, coin);
 			print_seed(seed, coin, true);
 		}
 		else if (restore != nullptr) {
@@ -97,7 +94,7 @@ int main(int argc, const char* argv[]) {
 		else {
 			std::cout << "Monero 14-word mnemonic seed proof of concept" << std::endl;
 			std::cout << "Usage: " << std::endl;
-			std::cout << argv[0] << " --create [--coin <monero|aeon>] [--net <MAIN|STAGE|TEST>] [--date <yyyy-MM-dd>]" << std::endl;
+			std::cout << argv[0] << " --create [--date <yyyy-MM-dd>] [--coin <monero|aeon>]" << std::endl;
 			std::cout << argv[0] << " --restore \"<14-word seed>\" [--coin <monero|aeon>]" << std::endl;
 		}
 	}

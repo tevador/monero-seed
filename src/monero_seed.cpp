@@ -47,9 +47,7 @@ constexpr std::time_t time_step = 2629746; //30.436875 days = 1/12 of the Gregor
 
 constexpr unsigned date_bits = 10;
 constexpr unsigned date_mask = (1u << date_bits) - 1;
-constexpr unsigned net_bits = 2;
-constexpr unsigned net_mask = (1u << net_bits) - 1;
-constexpr unsigned reserved_bits = 3;
+constexpr unsigned reserved_bits = 5;
 constexpr unsigned reserved_mask = (1u << reserved_bits) - 1;
 constexpr unsigned check_digits = 1;
 constexpr unsigned checksum_size = gf_elem::size() * check_digits;
@@ -64,16 +62,11 @@ static const std::string COIN_AEON = "aeon";
 
 constexpr gf_elem monero_flag = gf_elem(0x539);
 constexpr gf_elem aeon_flag = gf_elem(0x201);
-constexpr int flag_word = 1;
-
-static const char* net_types[] = {
-	"MAIN", "STAGE", "TEST", nullptr
-};
 
 static const char* KDF_PBKDF2 = "PBKDF2-HMAC-SHA256/4096";
 
 static_assert(total_bits
-	== net_bits + reserved_bits + date_bits + checksum_size +
+	== reserved_bits + date_bits + checksum_size +
 	sizeof(monero_seed::secret_seed) * CHAR_BIT,
 	"Invalid mnemonic seed size");
 
@@ -119,32 +112,21 @@ static gf_elem get_coin_flag(const std::string& coin) {
 
 static const reed_solomon_code rs(check_digits);
 
-monero_seed::monero_seed(std::time_t date_created, const std::string& coin, const std::string& net) {
+monero_seed::monero_seed(std::time_t date_created, const std::string& coin) {
 	if (date_created < epoch) {
 		THROW_EXCEPTION("date_created must not be before 1st June 2020");
 	}
 	unsigned quantized_date = ((date_created - epoch) / time_step) & date_mask;
 	date_ = epoch + quantized_date * time_step;
 	gf_elem coin_flag = get_coin_flag(coin);
-	net_name_ = nullptr;
-	for (int i = 0; i < net_mask; ++i) {
-		if (net_types[i] == net) {
-			net_type_ = i;
-			net_name_ = net_types[i];
-		}
-	}
-	if (net_name_ == nullptr) {
-		THROW_EXCEPTION("invalid network type");
-	}
 	reserved_ = 0;
 	secure_random::gen_bytes(seed_.data(), seed_.size());
 	uint8_t salt[25] = "Monero 14-word seed";
-	salt[20] = net_type_;
+	salt[20] = reserved_;
 	store32(salt + 21, quantized_date);
 	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
 	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
 	unsigned rem_bits = gf_elem::size();
-	write_data(message_, rem_bits, net_type_, net_bits);
 	write_data(message_, rem_bits, reserved_, reserved_bits);
 	write_data(message_, rem_bits, quantized_date, date_bits);
 	for (auto byte : seed_) {
@@ -152,7 +134,7 @@ monero_seed::monero_seed(std::time_t date_created, const std::string& coin, cons
 	}
 	assert(rem_bits == 0);
 	rs.encode(message_);
-	message_[flag_word] -= coin_flag;
+	message_[check_digits] -= coin_flag;
 }
 
 monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
@@ -191,17 +173,17 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 	if (error >= 0) {
 		for (unsigned i = 0; i < gf_2048::elements(); ++i) {
 			message_[error] = i;
-			message_[flag_word] += coin_flag;
+			message_[check_digits] += coin_flag;
 			if (rs.check(message_)) {
 				correction_ = wordlist::english.get_word(i);
 				break;
 			}
-			message_[flag_word] -= coin_flag;
+			message_[check_digits] -= coin_flag;
 		}
 		assert(!correction_.empty());
 	}
 	else {
-		message_[flag_word] += coin_flag;
+		message_[check_digits] += coin_flag;
 		if (!rs.check(message_)) {
 			THROW_EXCEPTION("phrase is invalid (checksum mismatch)");
 		}
@@ -209,12 +191,10 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 
 	unsigned used_bits = checksum_size;
 	unsigned quantized_date;
-	net_type_ = 0;
 	reserved_ = 0;
 	quantized_date = 0;
 	memset(seed_.data(), 0, seed_.size());
 
-	read_data(message_, used_bits, net_type_, net_bits);
 	read_data(message_, used_bits, reserved_, reserved_bits);
 	read_data(message_, used_bits, quantized_date, date_bits);
 
@@ -228,16 +208,10 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 		THROW_EXCEPTION("reserved bits must be zero");
 	}
 
-	net_name_ = net_types[net_type_];
-
-	if (net_name_ == nullptr) {
-		THROW_EXCEPTION("invalid network type");
-	}
-
 	date_ = epoch + quantized_date * time_step;
 
 	uint8_t salt[25] = "Monero 14-word seed";
-	salt[20] = net_type_;
+	salt[20] = reserved_;
 	store32(salt + 21, quantized_date);
 	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
 	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
