@@ -1,3 +1,6 @@
+**Note: this repository used to define a 14-word seed. The length of the seed was changed to 16 words for security reasons (see the [Security](#security) section below).**
+
+
 ## Build
 ```
 git clone https://github.com/tevador/monero-seed.git
@@ -9,6 +12,7 @@ make
 
 ## Features
 
+* 36% shorter than the current 25-word seed used by Monero
 * embedded wallet birthday to optimize restoring from the seed (only blocks after the wallet birthday have to be scanned for transactions)
 * 5 bits reserved for future updates
 * advanced checksum based on Reed-Solomon linear code, which allows certain types of errors to be detected without false positives and provides limited error correction capability
@@ -25,29 +29,29 @@ make
 Example:
 ```
 > ./monero-seed --create --date 2100/03/14 --coin monero
-Mnemonic phrase: test park taste security oxygen decorate essence ridge ship fish vehicle dream fluid pattern
+Mnemonic phrase: lab park submit photo priority syrup speak couch fire crack canoe use spoil balance false solar
 - coin: monero
-- private key: 7b816d8134e29393b0333eed4b6ed6edf97c156ad139055a706a6fb9599dcf8c
+- private key: 2bb5cfea96a0f981bf5da4fff74f43ae833682298276bce87bca455dfc14af5d
 - created on or after: 02/Mar/2100
 ```
 
 ### Restore seed
 ```
-./monero-seed --restore "<14-word seed>" [--coin <monero|aeon>]
+./monero-seed --restore "<16-word seed>" [--coin <monero|aeon>]
 ```
 
 Example:
 
 ```
-> ./monero-seed --restore "test park taste security oxygen decorate essence ridge ship fish vehicle dream fluid pattern" --coin monero
+> ./monero-seed --restore "lab park submit photo priority syrup speak couch fire crack canoe use spoil balance false solar" --coin monero
 - coin: monero
-- private key: 7b816d8134e29393b0333eed4b6ed6edf97c156ad139055a706a6fb9599dcf8c
+- private key: 2bb5cfea96a0f981bf5da4fff74f43ae833682298276bce87bca455dfc14af5d
 - created on or after: 02/Mar/2100
 ```
 
 Attempting to restore the same seed under a different coin will fail:
 ```
-> ./monero-seed --restore "test park taste security oxygen decorate essence ridge ship fish vehicle dream fluid pattern" --coin aeon
+> ./monero-seed --restore "lab park submit photo priority syrup speak couch fire crack canoe use spoil balance false solar" --coin aeon
 ERROR: phrase is invalid (checksum mismatch)
 ```
 
@@ -55,20 +59,20 @@ Restore has limited error correction capability, namely it can correct a single 
 This can be tested by replacing a word with `xxxx`:
 
 ```
-> ./monero-seed --restore "test park xxxx security oxygen decorate essence ridge ship fish vehicle dream fluid pattern" --coin monero
-Warning: corrected erasure: xxxx -> taste
+> ./monero-seed --restore "lab park xxxx photo priority syrup speak couch fire crack canoe use spoil balance false solar" --coin monero
+Warning: corrected erasure: xxxx -> submit
 - coin: monero
-- private key: 7b816d8134e29393b0333eed4b6ed6edf97c156ad139055a706a6fb9599dcf8c
+- private key: 2bb5cfea96a0f981bf5da4fff74f43ae833682298276bce87bca455dfc14af5d
 - created on or after: 02/Mar/2100
 ```
 
 ## Implementation details
 
-The mnemonic phrase contains 154 bits of data, which are used as follows:
+The mnemonic phrase contains 176 bits of data, which are used as follows:
 
 * 5 bits reserved for future use
 * 10 bits for approximate wallet birthday
-* 128 bits for the private key seed
+* 150 bits for the private key seed
 * 11 bits for checksum
 
 ### Wordlist
@@ -80,7 +84,7 @@ for example each word can be uniquly identified by its first 4 characters. The w
 
 There are 5 reserved bits for future use. Possible use cases for the reserved bits include:
 
-* a flag to differentiate between normal and "short" address format (with view key equal to the spend key)
+* different address formats
 * different KDF algorithms for generating the private key
 * seed encrypted with a passphrase
 
@@ -95,11 +99,17 @@ The mnemonic phrase stores the approximate date when the wallet was created. Thi
 
 The wallet birthday has a resolution of 2629746 seconds (1/12 of the average Gregorian year). All dates between June 2020 and September 2105 can be represented.
 
-### Private key seed
+### Private key derivation
 
-The private key is derived from the 128-bit seed using PBKDF2-HMAC-SHA256 with 4096 iterations.The wallet birthday and the 5 reserved/feature bits are used as a salt. 128-bit seed provides the same level of security as the elliptic curve used by Monero.
+The private spend key is derived from the 150-bit seed using PBKDF2-HMAC-SHA256 with 4096 iterations.The wallet birthday and the 5 reserved/feature bits are used as a salt. Future extensions may define other KDFs.
 
-Future extensions may define other KDFs.
+### Security
+
+Calculating a Curve25519 private key from the public key using the Pollard's rho method takes on average <code>2<sup>125.8</sup></code> operations [[ref](https://safecurves.cr.yp.to/rho.html)]. Bruteforcing a 128-bit seed would take on average <code>2<sup>127</sup></code> iterations. Therefore it may seem that a 128-bit seed provides a similar security level as the elliptic curve itself and we could shorten the mnemonic phrase to just 14 words.
+
+However, the math changes when we consider an attack against many keys at once. Breaking one public key out of a million using the Pollard's rho method would still take on average <code>2<sup>125.8</sup></code> operations. On the other hand, when attacking a million wallets generated in the same month (thus havng the same wallet birthday bitstring), one would expect to recover the first seed after just <code>2<sup>107</sup></code> attempts. While this is still infeasible, it's a noticeable drop in the security margin.
+
+Using a 150-bit private key seed means that for up to ~17 million new active wallets generated each month, a brute force search of the seed space to recover at least one private key seed would be at least as hard as breaking a public key directly. The security margin is probably even higher due to a much larger constant factor for the bruteforce search.
 
 ### Checksum
 

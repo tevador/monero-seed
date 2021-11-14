@@ -92,10 +92,10 @@ int main(int argc, const char* argv[]) {
 			print_seed(seed, coin, false);
 		}
 		else {
-			std::cout << "Monero 14-word mnemonic seed proof of concept" << std::endl;
+			std::cout << "Monero 16-word mnemonic seed proof of concept" << std::endl;
 			std::cout << "Usage: " << std::endl;
 			std::cout << argv[0] << " --create [--date <yyyy-MM-dd>] [--coin <monero|aeon>]" << std::endl;
-			std::cout << argv[0] << " --restore \"<14-word seed>\" [--coin <monero|aeon>]" << std::endl;
+			std::cout << argv[0] << " --restore \"<16-word seed>\" [--coin <monero|aeon>]" << std::endl;
 		}
 	}
 	catch (const std::exception & ex) {

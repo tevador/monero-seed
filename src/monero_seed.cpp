@@ -27,7 +27,7 @@ public:
 	monero_seed_exception(const std::string& msg)
 		: msg_(msg)
 	{ }
-	~monero_seed_exception() throw() {}
+	~monero_seed_exception() noexcept {}
 
 	const char* what() const throw() override {
 		return msg_.c_str();
@@ -66,8 +66,7 @@ constexpr gf_elem aeon_flag = gf_elem(0x201);
 static const char* KDF_PBKDF2 = "PBKDF2-HMAC-SHA256/4096";
 
 static_assert(total_bits
-	== reserved_bits + date_bits + checksum_size +
-	sizeof(monero_seed::secret_seed) * CHAR_BIT,
+	== reserved_bits + date_bits + checksum_size + seed_bits,
 	"Invalid mnemonic seed size");
 
 static void write_data(gf_poly& poly, unsigned& rem_bits, unsigned value, unsigned bits) {
@@ -121,16 +120,20 @@ monero_seed::monero_seed(std::time_t date_created, const std::string& coin) {
 	gf_elem coin_flag = get_coin_flag(coin);
 	reserved_ = 0;
 	secure_random::gen_bytes(seed_.data(), seed_.size());
-	uint8_t salt[25] = "Monero 14-word seed";
+	uint8_t salt[25] = "Monero 16-word seed";
 	salt[20] = reserved_;
 	store32(salt + 21, quantized_date);
 	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
 	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
+	seed_.back() &= (1u << (seed_bits & (CHAR_BIT - 1))) - 1; //clear excess bits
 	unsigned rem_bits = gf_elem::size();
 	write_data(message_, rem_bits, reserved_, reserved_bits);
 	write_data(message_, rem_bits, quantized_date, date_bits);
+	unsigned seed_rem_bits = seed_bits;
 	for (auto byte : seed_) {
-		write_data(message_, rem_bits, byte, CHAR_BIT);
+		unsigned chunk_bits = std::min((unsigned)CHAR_BIT, seed_rem_bits);
+		seed_rem_bits -= chunk_bits;
+		write_data(message_, rem_bits, byte, chunk_bits);
 	}
 	assert(rem_bits == 0);
 	rs.encode(message_);
@@ -178,7 +181,7 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 				correction_ = wordlist::english.get_word(i);
 				break;
 			}
-			message_[check_digits] -= coin_flag;
+			message_[check_digits] += coin_flag;
 		}
 		assert(!correction_.empty());
 	}
@@ -198,8 +201,11 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 	read_data(message_, used_bits, reserved_, reserved_bits);
 	read_data(message_, used_bits, quantized_date, date_bits);
 
+	unsigned seed_rem_bits = seed_bits;
 	for (uint8_t& byte : seed_) {
-		read_data(message_, used_bits, byte, CHAR_BIT);
+		unsigned chunk_bits = std::min((unsigned)CHAR_BIT, seed_rem_bits);
+		seed_rem_bits -= chunk_bits;
+		read_data(message_, used_bits, byte, chunk_bits);
 	}
 
 	assert(used_bits == total_bits);
@@ -210,15 +216,16 @@ monero_seed::monero_seed(const std::string& phrase, const std::string& coin) {
 
 	date_ = epoch + quantized_date * time_step;
 
-	uint8_t salt[25] = "Monero 14-word seed";
+	uint8_t salt[25] = "Monero 16-word seed";
 	salt[20] = reserved_;
 	store32(salt + 21, quantized_date);
 	//argon2id_hash_raw(argon_tcost, argon_mcost, 1, seed_.data(), seed_.size(), salt, sizeof(salt), key_.data(), key_.size());
 	pbkdf2_hmac_sha256(seed_.data(), seed_.size(), salt, sizeof(salt), pbkdf2_iterations, key_.data(), key_.size());
+	message_[check_digits] -= coin_flag;
 }
 
 std::ostream& operator<<(std::ostream& os, const monero_seed& seed) {
-	for (int i = 0; i <= seed.message_.degree(); ++i) {
+	for (unsigned i = 0; i <= gf_poly::max_degree; ++i) {
 		if (i > 0) {
 			os << " ";
 		}

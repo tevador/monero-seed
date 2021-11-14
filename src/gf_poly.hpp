@@ -11,7 +11,7 @@
 
 class gf_poly {
 public:
-	static constexpr size_t max_degree = 13;
+	static constexpr size_t max_degree = 15;
 	gf_poly() : degree_(0) //zero polynomial
 	{
 	}

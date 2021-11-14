@@ -11,10 +11,12 @@
 #include <ctime>
 #include "gf_poly.hpp"
 
+constexpr unsigned seed_bits = 150;
+
 class monero_seed {
 public:
 	static const std::string erasure;
-	static constexpr size_t size = 16;
+	static constexpr size_t size = (seed_bits + CHAR_BIT - 1) / CHAR_BIT;
 	static constexpr size_t key_size = 32;
 	using secret_key = std::array<uint8_t, key_size>;
 	using secret_seed = std::array<uint8_t, size>;
