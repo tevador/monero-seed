@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <iostream>
 #include <ctime>
+#include <climits>
 #include "gf_poly.hpp"
 
 constexpr unsigned seed_bits = 150;
