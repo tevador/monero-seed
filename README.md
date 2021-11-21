@@ -1,5 +1,4 @@
-**Note: this repository used to define a 14-word seed. The length of the seed was changed to 16 words for security reasons (see the [Security](#security) section below).**
-
+**This repository was a proof of concept and is now obsolete. The idea was implemented into a library [here](https://github.com/tevador/polyseed).**
 
 ## Build
 ```
